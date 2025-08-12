@@ -1,0 +1,19 @@
+{
+  "name": "guess-the-imposter",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -k \"pnpm --filter @imposter/server dev\" \"pnpm --filter @imposter/client dev\"",
+    "lint": "pnpm -r lint",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
+
+
