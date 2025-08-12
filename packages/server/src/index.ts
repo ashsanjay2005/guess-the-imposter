@@ -57,10 +57,12 @@ export function createServer(port = 4000) {
     cors: {
       origin: '*',
     },
+    // Allow both websocket and polling; some networks block one or the other
+    transports: ['websocket', 'polling'],
   });
 
   io.on('connection', (socket) => {
-    // Helper to emit snapshot
+    // Helper to emit snapshot (include current deadline for timer resync)
     const emitSnapshot = (room: Room) => io.to(room.code).emit('room:update', {
       code: room.code,
       hostId: room.hostId,
@@ -76,6 +78,7 @@ export function createServer(port = 4000) {
       chat: room.chat,
       settings: room.settings,
       questionBank: room.questionBank,
+      deadlineAt: require('./stateMachine').getDeadline(room.code),
     });
 
     socket.on('disconnect', () => {
@@ -91,8 +94,17 @@ export function createServer(port = 4000) {
     socket.on('room:create', (payload: { name: string }, cb: Function) => {
       const schema = z.object({ name: z.string().min(2).max(16) });
       const { name } = schema.parse(payload);
-      const sessionId = (socket.handshake.headers['x-session-id'] as string) || socket.id;
+      const sessionId = (socket.handshake.auth as any)?.sessionId
+        || (socket.handshake.headers['x-session-id'] as string)
+        || socket.id;
       const clean = name.replace(/[^a-zA-Z0-9 _-]/g, '');
+      // If this socket is already in another room, leave it first to avoid receiving updates from multiple rooms
+      const current = roomManager.getRoomByPlayer(socket.id);
+      if (current) {
+        roomManager.leave(socket.id);
+        socket.leave(current.code);
+        emitSnapshot(current);
+      }
       const room = roomManager.createRoom(clean, socket.id, sessionId);
       socket.join(room.code);
       cb({ code: room.code, player: room.players[0] });
@@ -102,8 +114,17 @@ export function createServer(port = 4000) {
     socket.on('room:join', (payload: { code: string; name: string }, cb: Function) => {
       const schema = z.object({ code: z.string().length(6), name: z.string().min(2).max(16) });
       const { code, name } = schema.parse(payload);
-      const sessionId = (socket.handshake.headers['x-session-id'] as string) || socket.id;
+      const sessionId = (socket.handshake.auth as any)?.sessionId
+        || (socket.handshake.headers['x-session-id'] as string)
+        || socket.id;
       const clean = name.replace(/[^a-zA-Z0-9 _-]/g, '');
+      // Leave any previously joined room for this socket to prevent cross-room updates
+      const current = roomManager.getRoomByPlayer(socket.id);
+      if (current && current.code !== code) {
+        roomManager.leave(socket.id);
+        socket.leave(current.code);
+        emitSnapshot(current);
+      }
       const { room, player, error } = roomManager.joinRoom(
         code.toUpperCase(),
         clean,
@@ -131,6 +152,70 @@ export function createServer(port = 4000) {
         settings: room.settings,
         questionBank: room.questionBank,
       }, player });
+      // Resync the just-joined socket with current phase-specific data
+      const { getDeadline } = require('./stateMachine');
+      const deadlineAt = getDeadline(room.code);
+      switch (room.state) {
+        case 'ANSWERING': {
+          const isImposter = room.imposterId === player.id;
+          const yourQuestion = isImposter ? room.currentPair?.imposterQuestion : room.currentPair?.majorityQuestion;
+          io.to(socket.id).emit('round:phase', { state: 'ANSWERING', deadlineAt, yourQuestion });
+          break;
+        }
+        case 'REVEAL_ANSWERS': {
+          const answersWithNames = room.answers.map((a: any) => ({
+            text: a.text,
+            name: room.players.find((p) => p.id === a.playerId)?.name ?? 'Unknown',
+          }));
+          const anonymized = room.settings.showNamesWithAnswers
+            ? answersWithNames.map((a: any) => `${a.name}: ${a.text}`)
+            : answersWithNames.map((a: any) => a.text);
+          const finalList = room.settings.randomizeAnswerOrder
+            ? [...anonymized]
+            : anonymized;
+          io.to(socket.id).emit('round:phase', { state: 'REVEAL_ANSWERS', deadlineAt });
+          io.to(socket.id).emit('round:answersRevealed', {
+            answers: finalList,
+            majorityQuestion: room.currentPair?.majorityQuestion,
+          });
+          break;
+        }
+        case 'DISCUSS':
+        case 'VOTING': {
+          io.to(socket.id).emit('round:phase', { state: room.state, deadlineAt });
+          break;
+        }
+        case 'RESULTS': {
+          io.to(socket.id).emit('round:phase', { state: 'RESULTS', deadlineAt });
+          if (room.currentPair) {
+            io.to(socket.id).emit('round:questionsRevealed', {
+              majorityQuestion: room.currentPair.majorityQuestion,
+              imposterQuestion: room.currentPair.imposterQuestion,
+            });
+          }
+          // derive majorityWon from current votes
+          const tally = new Map<string, number>();
+          for (const v of room.votes) tally.set(v.targetId, (tally.get(v.targetId) ?? 0) + 1);
+          let topId: string | undefined; let topVotes = -1;
+          for (const [id, count] of tally.entries()) { if (count > topVotes) { topVotes = count; topId = id; } }
+          const numWithTop = [...tally.values()].filter((c) => c === topVotes).length;
+          const majorityWon = topVotes > 0 && numWithTop === 1 && topId === room.imposterId;
+          io.to(socket.id).emit('round:results', {
+            imposterId: room.imposterId,
+            votes: room.votes,
+            majorityWon,
+            scores: room.scores,
+            playerScores: room.playerScores,
+            questions: room.currentPair ? {
+              majorityQuestion: room.currentPair.majorityQuestion,
+              imposterQuestion: room.currentPair.imposterQuestion,
+            } : undefined,
+          });
+          break;
+        }
+        default:
+          break;
+      }
       emitSnapshot(room);
     });
 
@@ -328,9 +413,9 @@ export function createServer(port = 4000) {
     });
   });
 
-  server.listen(port, () => {
+  server.listen(port, '0.0.0.0', () => {
     // eslint-disable-next-line no-console
-    console.log(`[server] listening on http://localhost:${port}`);
+    console.log(`[server] listening on 0.0.0.0:${port}`);
   });
 
   return { app, server, io };

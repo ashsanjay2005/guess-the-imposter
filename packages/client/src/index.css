@@ -4,6 +4,19 @@
 
 :root { color-scheme: dark; }
 
+.min-h-dvh { min-height: 100dvh; }
+html, body { height: 100dvh; }
+.mobile-safe { padding-bottom: max(env(safe-area-inset-bottom), 12px); }
+
+/* When mobile actions are present, ensure inputs scroll above them */
+body.has-mobile-actions input, body.has-mobile-actions textarea, body.has-mobile-actions [contenteditable="true"] {
+  scroll-margin-bottom: calc(var(--mobile-actions-h, 96px) + 16px);
+}
+:root { --mobile-actions-h: 0px; }
+
+/* Reserve space at the bottom equal to the action bar height so content doesn't hide under it */
+.with-mobile-actions-space { padding-bottom: calc(var(--mobile-actions-h) + max(env(safe-area-inset-bottom), 16px)); }
+
 .card {
   @apply bg-slate-800/80 backdrop-blur rounded-2xl shadow-soft border border-slate-700;
 }

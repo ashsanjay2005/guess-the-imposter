@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useSocket } from '../socket/SocketProvider';
 import { PlayerAvatar } from '../components/PlayerAvatar';
@@ -39,6 +39,7 @@ export const RoomPage: React.FC = () => {
   const [copyOk, setCopyOk] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [showHowTo, setShowHowTo] = useState(false);
+  const [mobileSubmitted, setMobileSubmitted] = useState(false);
 
   useEffect(() => {
     if (room || joined) return; // already in a room
@@ -49,6 +50,8 @@ export const RoomPage: React.FC = () => {
   const isHost = room && room.hostId && room.players.some((p) => p.id === room.hostId && p.name === name);
   const players = room ? room.players : [];
   const inviteUrl = room ? `${window.location.origin}/room/${room.code}` : '';
+  const meId = room?.players.find((p: any) => p.name === name)?.id;
+  const youAnswered = !!room?.answers?.some((a: any) => a.playerId === meId);
   // Keyboard shortcut: R to ready toggle
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -61,7 +64,7 @@ export const RoomPage: React.FC = () => {
     return () => window.removeEventListener('keydown', handler);
   }, [room?.state, readyToggle]);
 
-  if (!room) return <div className="p-6">Joining room…</div>;
+  if (!room) return <div className="p-6 min-h-dvh grid place-items-center">Joining room…</div>;
 
   return (
     <div className="min-h-screen grid lg:grid-cols-[1fr_320px] gap-6 p-6">
@@ -97,7 +100,41 @@ export const RoomPage: React.FC = () => {
                 <button className="primary" onClick={nextRound}>Next Round</button>
               )}
               <button className="secondary" onClick={() => setShowHowTo(true)}>How to play</button>
-              <button id="copyInviteRoom" className="secondary active:scale-[.98] transition" onClick={async () => { await navigator.clipboard.writeText(inviteUrl); const btn = document.getElementById('copyInviteRoom'); if (btn) { const orig = btn.textContent; btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = orig || 'Copy Invite Link'; }, 1500);} }}>Copy Invite Link</button>
+              <button
+                id="copyInviteRoom"
+                className="secondary active:scale-[.98] transition"
+                onClick={async () => {
+                  const isMobile = (navigator as any).userAgentData?.mobile === true || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+                  let copied = false;
+                  try {
+                    // Only use native share on mobile; desktop should copy silently
+                    if (isMobile && (navigator as any).share) {
+                      await (navigator as any).share({ title: 'Guess the Imposter', text: 'Join my room', url: inviteUrl });
+                      copied = true;
+                    } else if ((navigator as any).clipboard?.writeText) {
+                      await (navigator as any).clipboard.writeText(inviteUrl);
+                      copied = true;
+                    }
+                  } catch {}
+                  if (!copied) {
+                    const ta = document.createElement('textarea');
+                    ta.value = inviteUrl;
+                    ta.style.position = 'fixed';
+                    ta.style.left = '-9999px';
+                    document.body.appendChild(ta);
+                    ta.focus();
+                    ta.select();
+                    try { copied = document.execCommand('copy'); } catch {}
+                    document.body.removeChild(ta);
+                  }
+                  const btn = document.getElementById('copyInviteRoom');
+                  if (btn) {
+                    const orig = btn.textContent;
+                    btn.textContent = copied ? 'Copied!' : 'Copy failed';
+                    setTimeout(() => { btn.textContent = orig || 'Copy Invite Link'; }, 1500);
+                  }
+                }}
+              >Copy Invite Link</button>
             </div>
           </div>
           {copyOk && <div className="mt-2 text-xs text-emerald-400">{copyOk}</div>}
@@ -125,9 +162,20 @@ export const RoomPage: React.FC = () => {
         {room.state === 'ANSWERING' && (
           <>
             <AnswerPanel question={yourQuestion} onSubmit={sendAnswer} />
+            {!youAnswered && !mobileSubmitted && (
             <MobileActions>
-              <button className="primary w-full" onClick={() => sendAnswer((document.querySelector('input.text') as HTMLInputElement)?.value || '')}>Submit</button>
+              <div className="w-full px-3">
+                <div className="card bg-transparent border-0 p-0">
+                  <button
+                    className="primary w-full rounded-2xl py-3 text-base shadow-soft"
+                    onClick={() => { setMobileSubmitted(true); sendAnswer((document.querySelector('input.text') as HTMLInputElement)?.value || ''); }}
+                  >
+                    Submit
+                  </button>
+                </div>
+              </div>
             </MobileActions>
+            )}
           </>
         )}
 

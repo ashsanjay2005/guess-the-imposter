@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import type { Player, QuestionPair, Room, RoomSettings, RoundState } from '../lib/types';
 
@@ -68,8 +68,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    const serverUrl = (import.meta as any).env?.VITE_SERVER_URL ?? 'http://localhost:4000';
-    // Use a stable per-tab session id to prevent duplicate joins on reconnects
+    // Point to explicit env if provided; otherwise use current host so phones on the LAN work automatically
+    const fallbackHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+    const serverUrl = (import.meta as any).env?.VITE_SERVER_URL ?? `http://${fallbackHost}:4000`;
+    // Stable per-tab id
     let sessionId = localStorage.getItem('sessionId');
     if (!sessionId) {
       sessionId = Math.random().toString(36).slice(2);
@@ -77,7 +79,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
     const s = io(serverUrl, {
       reconnection: true,
-      extraHeaders: { 'x-session-id': sessionId },
+      // Prefer websocket to avoid mobile XHR polling issues
+      transports: ['websocket'],
+      path: '/socket.io',
+      auth: { sessionId },
     });
     setSocket(s);
     return () => {
@@ -87,7 +92,21 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   useEffect(() => {
     if (!socket) return;
-    const onUpdate = (snapshot: Snapshot) => setRoom(snapshot);
+    const prevCodeRef = { current: (room as any)?.code ?? null } as { current: string | null };
+    const onUpdate = (snapshot: Snapshot) => {
+      // If we switched rooms or returned to lobby, clear transient phase state to avoid stale timers/questions
+      const switchedRoom = prevCodeRef.current && prevCodeRef.current !== snapshot.code;
+      if (switchedRoom || snapshot.state === 'LOBBY') {
+        setYourQuestion(undefined);
+        setDeadlineAt(undefined);
+        setAnswersRevealed([]);
+        setAnswersMajorityQuestion(undefined);
+        setQuestionsRevealed(undefined);
+        setRoundResults(undefined);
+      }
+      prevCodeRef.current = snapshot.code;
+      setRoom(snapshot);
+    };
     const onToast = (t: Omit<Toast, 'id'>) => {
       // If a key is provided, replace any existing toast with the same key to prevent stacking
       setToasts((prev) => {
@@ -118,7 +137,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const onQuestions = (payload: { majorityQuestion: string; imposterQuestion: string }) =>
       setQuestionsRevealed(payload);
     const onResults = (payload: any) => setRoundResults(payload);
-    const onConnectError = (err: any) => setToasts((prev) => [...prev, { type: 'error', message: `Socket error: ${err?.message ?? 'connection failed'}` }]);
+    const onConnectError = (err: any) => setToasts((prev) => [...prev, { id: Math.random().toString(36).slice(2), type: 'error', message: `Socket error: ${err?.message ?? 'connection failed'}` }]);
     socket.on('room:update', onUpdate);
     socket.on('toast', onToast as any);
     socket.on('round:phase', onPhase);
@@ -173,6 +192,12 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       localStorage.setItem('name', name);
       localStorage.setItem('lastRoomCode', resp.code);
       sessionStorage.setItem('allowAutoReconnect', '1');
+      // New room, clear any previous phase state
+      setYourQuestion(undefined);
+      setDeadlineAt(undefined);
+      setAnswersRevealed([]);
+      setQuestionsRevealed(undefined);
+      setRoundResults(undefined);
       return resp;
     },
     async joinRoom(code: string, name: string) {
@@ -187,6 +212,12 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       localStorage.setItem('name', name);
       localStorage.setItem('lastRoomCode', code);
       sessionStorage.setItem('allowAutoReconnect', '1');
+      // Switched room or rejoined: clear stale phase state until the server sends fresh events
+      setYourQuestion(undefined);
+      setDeadlineAt(undefined);
+      setAnswersRevealed([]);
+      setQuestionsRevealed(undefined);
+      setRoundResults(undefined);
       return resp;
     },
     leaveRoom() {

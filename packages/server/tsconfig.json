@@ -12,7 +12,7 @@
     "types": ["node"],
     "resolveJsonModule": true
   },
-  "include": ["src", "tests"]
+  "include": ["src"]
 }
 
 
