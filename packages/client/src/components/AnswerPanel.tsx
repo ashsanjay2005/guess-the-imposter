@@ -11,12 +11,12 @@ export const AnswerPanel: React.FC<{ question?: string; onSubmit: (text: string)
     }
   }
   return (
-    <div className="card p-4 space-y-3">
+    <div className="card p-4 space-y-3 anim-fade-in">
       <div className="text-slate-300 text-sm">Your question</div>
       <div className="text-xl font-semibold">{question ?? 'Waiting...'}</div>
       <input className="text" placeholder="Type your answer…" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={handleKeyDown} onFocus={(e) => { setTimeout(() => e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100); }} />
       <div className="flex items-center gap-3">
-        <button className="primary" onClick={() => { onSubmit(text); setSubmitted(true); }} disabled={!text.trim() || submitted}>{submitted ? 'Submitted' : 'Submit Answer'}</button>
+        <button className="primary active:scale-[.98]" onClick={() => { onSubmit(text); setSubmitted(true); }} disabled={!text.trim() || submitted}>{submitted ? 'Submitted' : 'Submit Answer'}</button>
         {submitted && <span className="text-sm text-emerald-400">✓ Received</span>}
       </div>
     </div>

@@ -25,7 +25,7 @@ export const ResultsCard: React.FC<{
   const sorted = [...players].sort((a, b) => (playerScores[b.id] ?? 0) - (playerScores[a.id] ?? 0));
   const youAreReady = readyCount?.includes(myId ?? '') ?? false;
   return (
-    <div className="card p-4 space-y-3 transition-opacity duration-300 animate-[fadeIn_0.3s_ease-out]">
+    <div className="card p-4 space-y-3 anim-fade-in">
       <div className="text-xl font-semibold">{majorityWon ? 'Majority wins!' : 'Imposter wins!'}</div>
       <div className="space-y-2">
         <div className="text-slate-300">Imposter was: <span className="font-medium">{imposter?.name}</span></div>
@@ -48,7 +48,7 @@ export const ResultsCard: React.FC<{
           ))}
         </div>
       </div>
-      <div className="flex items-center gap-2 transition-transform duration-300">
+      <div className="flex items-center gap-2">
         <button className={`secondary ${youAreReady ? 'opacity-60 pointer-events-none' : ''}`} onClick={() => onReadyToggle?.(true)} title="R">{youAreReady ? 'Ready ✓' : 'Ready'}</button>
         <button className="secondary" onClick={() => onReadyToggle?.(false)} disabled={!youAreReady}>Unready</button>
         {isHost && readyCount && (

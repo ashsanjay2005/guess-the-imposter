@@ -14,6 +14,7 @@ import { HostSidebar } from '../components/HostSidebar';
 import { DiscussPanel } from '../components/DiscussPanel';
 import { ChatPanel } from '../components/ChatPanel';
 import { MobileActions } from '../components/MobileActions';
+import { HowToModal } from '../components/HowToModal';
 
 export const RoomPage: React.FC = () => {
   const { code } = useParams();
@@ -37,6 +38,7 @@ export const RoomPage: React.FC = () => {
   const [joined, setJoined] = useState(false);
   const [copyOk, setCopyOk] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
+  const [showHowTo, setShowHowTo] = useState(false);
 
   useEffect(() => {
     if (room || joined) return; // already in a room
@@ -94,6 +96,7 @@ export const RoomPage: React.FC = () => {
               {isHost && room.state === 'RESULTS' && (
                 <button className="primary" onClick={nextRound}>Next Round</button>
               )}
+              <button className="secondary" onClick={() => setShowHowTo(true)}>How to play</button>
               <button id="copyInviteRoom" className="secondary active:scale-[.98] transition" onClick={async () => { await navigator.clipboard.writeText(inviteUrl); const btn = document.getElementById('copyInviteRoom'); if (btn) { const orig = btn.textContent; btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = orig || 'Copy Invite Link'; }, 1500);} }}>Copy Invite Link</button>
             </div>
           </div>
@@ -171,6 +174,7 @@ export const RoomPage: React.FC = () => {
           </div>
         )}
       </div>
+      <HowToModal open={showHowTo} onClose={() => setShowHowTo(false)} manualModeNote={room?.settings?.manualMode} />
     </div>
   );
 };

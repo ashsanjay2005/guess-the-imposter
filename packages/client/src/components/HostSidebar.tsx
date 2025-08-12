@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import type { QuestionPair, Room } from '../lib/types';
 import { useSocket } from '../socket/SocketProvider';
+import { Tooltip } from './Tooltip';
 
 export const HostSidebar: React.FC<{ room: Room }> = ({ room }) => {
   const { updateSettings, upsertQuestionPair, deleteQuestionPair } = useSocket();
@@ -75,15 +76,15 @@ export const HostSidebar: React.FC<{ room: Room }> = ({ room }) => {
         <input type="checkbox" className="mt-2" checked={room.settings.showNamesWithAnswers} onChange={(e) => updateSettings({ showNamesWithAnswers: e.target.checked })} />
         <label className="label">Randomize answers</label>
         <input type="checkbox" className="mt-2" checked={room.settings.randomizeAnswerOrder} onChange={(e) => updateSettings({ randomizeAnswerOrder: e.target.checked })} />
-        <label className="label">Reveal Q delay (ms)</label>
+        <div className="flex items-center gap-2"><label className="label">Reveal Q delay (ms)</label><Tooltip text="Delay before questions are shown in Results."/></div>
         <input className="text" type="number" value={room.settings.suspenseMsQuestions} onChange={(e) => updateSettings({ suspenseMsQuestions: Number(e.target.value) })} />
-        <label className="label">Winner delay (ms)</label>
+        <div className="flex items-center gap-2"><label className="label">Winner delay (ms)</label><Tooltip text="Delay between questions and winner announcement."/></div>
         <input className="text" type="number" value={room.settings.suspenseMsWinner} onChange={(e) => updateSettings({ suspenseMsWinner: Number(e.target.value) })} />
-        <label className="label">Imposter delay (ms)</label>
+        <div className="flex items-center gap-2"><label className="label">Imposter delay (ms)</label><Tooltip text="Delay after winner before revealing the imposter."/></div>
         <input className="text" type="number" value={room.settings.suspenseMsImposter} onChange={(e) => updateSettings({ suspenseMsImposter: Number(e.target.value) })} />
-        <label className="label">Manual mode</label>
+        <div className="flex items-center gap-2"><label className="label">Manual mode</label><Tooltip text="Disables phase timers. Host advances from Reveal Answers & Discuss. Answering/Voting end when all respond."/></div>
         <input type="checkbox" className="mt-2" checked={room.settings.manualMode} onChange={(e) => updateSettings({ manualMode: e.target.checked })} />
-        <label className="label">Lock after start</label>
+        <div className="flex items-center gap-2"><label className="label">Lock after start</label><Tooltip text="After the game starts, new joiners become spectators only."/></div>
         <input type="checkbox" className="mt-2" checked={room.settings.lockAfterStart} onChange={(e) => updateSettings({ lockAfterStart: e.target.checked })} />
         <label className="label">Auto-save after changes</label>
         <input type="checkbox" className="mt-2" onChange={(e) => { if (e.target.checked) handleSaveServer(); }} />

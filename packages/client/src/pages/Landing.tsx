@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../socket/SocketProvider';
+import { HowToModal } from '../components/HowToModal';
 
 export const Landing: React.FC = () => {
   const { createRoom, joinRoom } = useSocket();
   const [name, setName] = useState(() => localStorage.getItem('name') || '');
   const [code, setCode] = useState(() => new URLSearchParams(location.search).get('code') || '');
   const navigate = useNavigate();
+  const [showHowTo, setShowHowTo] = useState(false);
 
   async function handleCreate() {
     const { code: roomCode } = await createRoom(name.trim());
@@ -50,10 +52,12 @@ export const Landing: React.FC = () => {
               }}
               id="copyInviteLanding"
             >Copy Invite Link</button>
+            <button className="secondary mt-2 ml-2" onClick={() => setShowHowTo(true)}>How to play</button>
           </div>
         </div>
         <p className="text-xs text-slate-400 text-center">Open multiple tabs to simulate 4 players</p>
       </div>
+      <HowToModal open={showHowTo} onClose={() => setShowHowTo(false)} />
     </div>
   );
 };

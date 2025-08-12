@@ -18,7 +18,7 @@ type Snapshot = Pick<
   | 'questionBank'
 >;
 
-type Toast = { id: string; type: 'info' | 'error' | 'success'; message: string };
+type Toast = { id: string; type: 'info' | 'error' | 'success'; message: string; key?: string };
 
 type Ctx = {
   socket: Socket | null;
@@ -89,11 +89,22 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!socket) return;
     const onUpdate = (snapshot: Snapshot) => setRoom(snapshot);
     const onToast = (t: Omit<Toast, 'id'>) => {
-      const toast = { id: Math.random().toString(36).slice(2), ...t } as Toast;
-      setToasts((prev) => [...prev, toast]);
+      // If a key is provided, replace any existing toast with the same key to prevent stacking
+      setToasts((prev) => {
+        const filtered = t.key ? prev.filter((p) => p.key !== t.key) : prev;
+        return [...filtered, { id: Math.random().toString(36).slice(2), ...t } as Toast];
+      });
       // auto-dismiss after 2.5s
       setTimeout(() => {
-        setToasts((prev) => prev.filter((p) => p.id !== toast.id));
+        setToasts((prev) => {
+          if (t.key) {
+            // remove by key (latest one) to avoid flicker
+            const idx = prev.findIndex((p) => p.key === t.key);
+            if (idx >= 0) return prev.filter((_, i) => i !== idx);
+          }
+          // fallback: remove last
+          return prev.slice(0, -1);
+        });
       }, 2500);
     };
     const onPhase = (payload: any) => {

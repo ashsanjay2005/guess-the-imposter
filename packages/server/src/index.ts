@@ -167,7 +167,11 @@ export function createServer(port = 4000) {
       const room = roomManager.getRoomByPlayer(socket.id);
       if (!room) return;
       if (room.hostId !== socket.id) return;
-      advancePhase(io, room);
+      // Emit countdown banner (3s) to clients then advance
+      io.to(room.code).emit('toast', { type: 'info', message: 'Advancing phase… 3', key: 'advance' });
+      setTimeout(() => io.to(room.code).emit('toast', { type: 'info', message: 'Advancing phase… 2', key: 'advance' }), 1000);
+      setTimeout(() => io.to(room.code).emit('toast', { type: 'info', message: 'Advancing phase… 1', key: 'advance' }), 2000);
+      setTimeout(() => advancePhase(io, room), 3000);
     });
 
     socket.on('host:updateSettings', (partial: Partial<Room['settings']>) => {
