@@ -5,6 +5,7 @@ import { useSocket } from '../socket/SocketProvider';
 export const HostSidebar: React.FC<{ room: Room }> = ({ room }) => {
   const { updateSettings, upsertQuestionPair, deleteQuestionPair } = useSocket();
   const [pair, setPair] = useState<QuestionPair>({ id: '', majorityQuestion: '', imposterQuestion: '' });
+  const [open, setOpen] = useState(true);
 
   function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -22,7 +23,7 @@ export const HostSidebar: React.FC<{ room: Room }> = ({ room }) => {
   }
 
   function handleExport() {
-    const blob = new Blob([JSON.stringify(room.questionBank, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify({ questionBank: room.questionBank, settings: room.settings }, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -31,9 +32,38 @@ export const HostSidebar: React.FC<{ room: Room }> = ({ room }) => {
     URL.revokeObjectURL(url);
   }
 
+  async function handleSaveServer() {
+    try {
+      await fetch(`http://localhost:4000/persist/${room.code}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questionBank: room.questionBank, settings: room.settings }),
+      });
+    } catch {}
+  }
+
+  async function handleLoadServer() {
+    try {
+      const res = await fetch(`http://localhost:4000/persist/${room.code}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data?.settings) updateSettings(data.settings);
+      if (Array.isArray(data?.questionBank)) {
+        for (const p of data.questionBank) await upsertQuestionPair(p);
+      }
+    } catch {}
+  }
+
   return (
     <div className="card p-4 space-y-4">
-      <h3 className="font-semibold">Host Controls</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold">Host Controls</h3>
+        <button className="secondary" onClick={() => setOpen((v) => !v)}>{open ? 'Hide' : 'Show'}</button>
+      </div>
+      {!open ? (
+        <div className="text-sm text-slate-400">Hidden (click Show to expand)</div>
+      ) : (
+        <>
       <div className="grid grid-cols-2 gap-3">
         <label className="label">Answer (s)</label>
         <input className="text" type="number" value={room.settings.answerSeconds} onChange={(e) => updateSettings({ answerSeconds: Number(e.target.value) })} />
@@ -45,6 +75,18 @@ export const HostSidebar: React.FC<{ room: Room }> = ({ room }) => {
         <input type="checkbox" className="mt-2" checked={room.settings.showNamesWithAnswers} onChange={(e) => updateSettings({ showNamesWithAnswers: e.target.checked })} />
         <label className="label">Randomize answers</label>
         <input type="checkbox" className="mt-2" checked={room.settings.randomizeAnswerOrder} onChange={(e) => updateSettings({ randomizeAnswerOrder: e.target.checked })} />
+        <label className="label">Reveal Q delay (ms)</label>
+        <input className="text" type="number" value={room.settings.suspenseMsQuestions} onChange={(e) => updateSettings({ suspenseMsQuestions: Number(e.target.value) })} />
+        <label className="label">Winner delay (ms)</label>
+        <input className="text" type="number" value={room.settings.suspenseMsWinner} onChange={(e) => updateSettings({ suspenseMsWinner: Number(e.target.value) })} />
+        <label className="label">Imposter delay (ms)</label>
+        <input className="text" type="number" value={room.settings.suspenseMsImposter} onChange={(e) => updateSettings({ suspenseMsImposter: Number(e.target.value) })} />
+        <label className="label">Manual mode</label>
+        <input type="checkbox" className="mt-2" checked={room.settings.manualMode} onChange={(e) => updateSettings({ manualMode: e.target.checked })} />
+        <label className="label">Lock after start</label>
+        <input type="checkbox" className="mt-2" checked={room.settings.lockAfterStart} onChange={(e) => updateSettings({ lockAfterStart: e.target.checked })} />
+        <label className="label">Auto-save after changes</label>
+        <input type="checkbox" className="mt-2" onChange={(e) => { if (e.target.checked) handleSaveServer(); }} />
       </div>
 
       <div className="space-y-2">
@@ -58,6 +100,8 @@ export const HostSidebar: React.FC<{ room: Room }> = ({ room }) => {
         <div className="flex gap-2 items-center">
           <input type="file" accept="application/json" onChange={handleImport} />
           <button className="secondary" onClick={handleExport}>Export JSON</button>
+          <button className="secondary" onClick={handleSaveServer}>Save</button>
+          <button className="secondary" onClick={handleLoadServer}>Load</button>
         </div>
         <div className="max-h-48 overflow-auto text-sm divide-y divide-slate-700">
           {room.questionBank.map((q) => (
@@ -72,6 +116,8 @@ export const HostSidebar: React.FC<{ room: Room }> = ({ room }) => {
           ))}
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 };

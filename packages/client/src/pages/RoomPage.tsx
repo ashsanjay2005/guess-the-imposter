@@ -13,6 +13,7 @@ import { Toasts } from '../components/Toasts';
 import { HostSidebar } from '../components/HostSidebar';
 import { DiscussPanel } from '../components/DiscussPanel';
 import { ChatPanel } from '../components/ChatPanel';
+import { MobileActions } from '../components/MobileActions';
 
 export const RoomPage: React.FC = () => {
   const { code } = useParams();
@@ -21,6 +22,7 @@ export const RoomPage: React.FC = () => {
     deadlineAt,
     yourQuestion,
     answersRevealed,
+    answersMajorityQuestion,
     questionsRevealed,
     joinRoom,
     startGame,
@@ -28,6 +30,7 @@ export const RoomPage: React.FC = () => {
     sendAnswer,
     sendVote,
     socket,
+    readyToggle,
   } = useSocket() as any;
 
   const [name, setName] = useState(() => localStorage.getItem('name') || `Player${Math.floor(Math.random()*100)}`);
@@ -41,11 +44,22 @@ export const RoomPage: React.FC = () => {
     joinRoom(code, name).then(() => { localStorage.setItem('name', name); setJoined(true); });
   }, [code, room, joinRoom, name, joined]);
 
-  if (!room) return <div className="p-6">Joining room…</div>;
+  const isHost = room && room.hostId && room.players.some((p) => p.id === room.hostId && p.name === name);
+  const players = room ? room.players : [];
+  const inviteUrl = room ? `${window.location.origin}/room/${room.code}` : '';
+  // Keyboard shortcut: R to ready toggle
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (room?.state !== 'RESULTS') return;
+      if (e.key.toLowerCase() === 'r') {
+        readyToggle(true);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [room?.state, readyToggle]);
 
-  const isHost = room.hostId && room.players.some((p) => p.id === room.hostId && p.name === name);
-  const players = room.players;
-  const inviteUrl = `${window.location.origin}/room/${room.code}`;
+  if (!room) return <div className="p-6">Joining room…</div>;
 
   return (
     <div className="min-h-screen grid lg:grid-cols-[1fr_320px] gap-6 p-6">
@@ -57,17 +71,25 @@ export const RoomPage: React.FC = () => {
                 <div className="text-xs text-slate-400">Room</div>
                 <div className="text-xl font-semibold">{room.code}</div>
               </div>
-              <div className="text-sm text-slate-400">/ You (click to edit): {editingName ? (
+              <div className="text-sm text-slate-400 flex items-center gap-2">/ 
+                {editingName ? (
                 <form onSubmit={(e) => { e.preventDefault(); setEditingName(false); localStorage.setItem('name', name); (socket as any)?.emit('player:updateName', { name }); }}>
                   <input className="text w-40" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
                 </form>
               ) : (
-                <button className="underline hover:no-underline" onClick={() => setEditingName(true)}>{name}</button>
-              )}</div>
+                <button className="px-2 py-1 rounded-full bg-slate-700 hover:bg-slate-600 border border-slate-600" onClick={() => setEditingName(true)}>
+                  <span className="mr-1">✎</span>{name}
+                </button>
+              )}
+                {isHost && <span className="text-xs px-2 py-0.5 rounded-full bg-amber-600 ml-2">Host</span>}
+              </div>
             </div>
             <div className="flex gap-2 items-center">
               {isHost && room.state === 'LOBBY' && (
                 <button className="primary" onClick={startGame} disabled={players.length < 4}>Start Game</button>
+              )}
+              {isHost && room.settings?.manualMode && (room.state === 'REVEAL_ANSWERS' || room.state === 'DISCUSS') && (
+                <button className="secondary" onClick={() => (socket as any)?.emit('host:advance')}>Next Phase</button>
               )}
               {isHost && room.state === 'RESULTS' && (
                 <button className="primary" onClick={nextRound}>Next Round</button>
@@ -86,20 +108,28 @@ export const RoomPage: React.FC = () => {
           <div className="card p-4">
             <div className="text-slate-300 text-sm mb-2">Players</div>
             <div className="grid sm:grid-cols-2 gap-2">
-              {players.map((p) => (
-                <PlayerAvatar key={p.id} player={p} highlight={p.id === room.hostId} isHost={p.id === room.hostId} isYou={p.name === name} dim={room.state === 'ANSWERING' && !(room.answers || []).some((a: any) => a.playerId === p.id)} />
-              ))}
+              {players.map((p) => {
+                const answered = (room.answers || []).some((a: any) => a.playerId === p.id);
+                return (
+                  <PlayerAvatar key={p.id} player={p} highlight={p.id === room.hostId} isHost={p.id === room.hostId} isYou={p.name === name} dim={room.state === 'ANSWERING' && !answered} answered={room.state === 'ANSWERING' ? answered : undefined} />
+                );
+              })}
             </div>
             <div className="text-slate-400 text-xs mt-2">Need exactly 4 players to start</div>
           </div>
         )}
 
         {room.state === 'ANSWERING' && (
-          <AnswerPanel question={yourQuestion} onSubmit={sendAnswer} />
+          <>
+            <AnswerPanel question={yourQuestion} onSubmit={sendAnswer} />
+            <MobileActions>
+              <button className="primary w-full" onClick={() => sendAnswer((document.querySelector('input.text') as HTMLInputElement)?.value || '')}>Submit</button>
+            </MobileActions>
+          </>
         )}
 
         {room.state === 'REVEAL_ANSWERS' && (
-          <AnswersReveal answers={answersRevealed} />
+          <AnswersReveal answers={answersRevealed} majorityQuestion={answersMajorityQuestion} />
         )}
 
         {/* We no longer reveal questions mid-round per new flow */}
@@ -109,12 +139,25 @@ export const RoomPage: React.FC = () => {
         )}
 
         {room.state === 'VOTING' && (
-          <VotingPanel players={players} onVote={sendVote} />
+          <>
+            <VotingPanel players={players} onVote={sendVote} />
+            <MobileActions>
+              <div className="text-center text-slate-300 text-sm">Tap a player to vote</div>
+            </MobileActions>
+          </>
         )}
 
         {/* Results injected via toast+update; we'll just show when state is RESULTS and votes should be in snapshot */}
         {room.state === 'RESULTS' && (
-          <ResultsLive />
+          <>
+            <ResultsLive />
+            <MobileActions>
+              <div className="flex gap-2">
+                <button className="secondary flex-1" onClick={() => readyToggle(true)}>Ready</button>
+                {isHost && <button className="primary flex-1" onClick={nextRound}>Next</button>}
+              </div>
+            </MobileActions>
+          </>
         )}
       </div>
 
@@ -133,14 +176,15 @@ export const RoomPage: React.FC = () => {
 };
 
 const ResultsLive: React.FC = () => {
-  const { room, nextRound, roundResults } = useSocket();
-  if (!room || !roundResults) return null;
+  const { room, nextRound, roundResults } = useSocket() as any;
+  if (!room) return null;
+  const r = roundResults ?? { imposterId: room.imposterId ?? '', votes: room.votes ?? [], majorityWon: (room.scores?.majority ?? 0) >= (room.scores?.imposter ?? 0), questions: undefined };
   const { socket } = useSocket() as any;
   const readyIds = (room as any).readyPlayerIds || [];
   const meId = (room as any).players.find((p: any) => p.name === (localStorage.getItem('name') || ''))?.id;
   const isHost = (room as any).hostId === meId;
   return (
-    <ResultsCard players={room.players} imposterId={roundResults.imposterId} votes={roundResults.votes} majorityWon={roundResults.majorityWon} playerScores={(room as any).playerScores ?? {}} questions={roundResults.questions} onNextRound={nextRound} readyCount={readyIds} onReadyToggle={(ready) => socket.emit('player:ready', { ready })} isHost={isHost} />
+    <ResultsCard players={room.players} imposterId={r.imposterId} votes={r.votes} majorityWon={r.majorityWon} playerScores={(room as any).playerScores ?? {}} questions={r.questions} onNextRound={nextRound} readyCount={readyIds} onReadyToggle={(ready) => socket.emit('player:ready', { ready })} isHost={isHost} myId={meId} />
   );
 };
 

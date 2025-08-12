@@ -90,7 +90,7 @@ export function nextRound(io: Server, room: Room) {
 function beginAnswering(io: Server, room: Room) {
   if (!room.currentPair) return;
   room.state = 'ANSWERING';
-  const deadlineAt = setDeadline(room, room.settings.answerSeconds);
+  const deadlineAt = room.settings.manualMode ? undefined : setDeadline(room, room.settings.answerSeconds);
 
   // Send per-player private question
   for (const player of room.players) {
@@ -107,10 +107,12 @@ function beginAnswering(io: Server, room: Room) {
 
   emitSnapshot(io, room);
 
-  const timers = roomTimers.get(room.code) || {};
-  clearTimeout(timers.answering);
-  timers.answering = setTimeout(() => revealAnswers(io, room), room.settings.answerSeconds * 1000);
-  roomTimers.set(room.code, timers);
+  if (!room.settings.manualMode) {
+    const timers = roomTimers.get(room.code) || {};
+    clearTimeout(timers.answering);
+    timers.answering = setTimeout(() => revealAnswers(io, room), room.settings.answerSeconds * 1000);
+    roomTimers.set(room.code, timers);
+  }
 }
 
 export function submitAnswer(io: Server, room: Room, playerId: string, text: string) {
@@ -149,41 +151,51 @@ function revealAnswers(io: Server, room: Room) {
   const finalList = room.settings.randomizeAnswerOrder ? shuffle(anonymized) : anonymized;
 
   io.to(room.code).emit('round:phase', { state: 'REVEAL_ANSWERS', deadlineAt });
-  io.to(room.code).emit('round:answersRevealed', { answers: finalList });
+  io.to(room.code).emit('round:answersRevealed', {
+    answers: finalList,
+    majorityQuestion: room.currentPair?.majorityQuestion,
+  });
   emitSnapshot(io, room);
 
   const timers = roomTimers.get(room.code) || {};
   clearTimeout(timers.revealAnswers);
-  // Keep answers up a bit longer for clarity
-  timers.revealAnswers = setTimeout(() => beginDiscuss(io, room), 5000);
-  roomTimers.set(room.code, timers);
+  // In manual mode, do not auto-advance
+  if (!room.settings.manualMode) {
+    // Keep answers up a bit longer for clarity
+    timers.revealAnswers = setTimeout(() => beginDiscuss(io, room), 5000);
+    roomTimers.set(room.code, timers);
+  }
 }
 
 // removed mid-round question reveal
 
 function beginDiscuss(io: Server, room: Room) {
   room.state = 'DISCUSS';
-  const deadlineAt = setDeadline(room, room.settings.discussSeconds);
+  const deadlineAt = room.settings.manualMode ? undefined : setDeadline(room, room.settings.discussSeconds);
   io.to(room.code).emit('round:phase', { state: 'DISCUSS', deadlineAt });
   emitSnapshot(io, room);
 
-  const timers = roomTimers.get(room.code) || {};
-  clearTimeout(timers.discuss);
-  timers.discuss = setTimeout(() => beginVoting(io, room), room.settings.discussSeconds * 1000);
-  roomTimers.set(room.code, timers);
+  if (!room.settings.manualMode) {
+    const timers = roomTimers.get(room.code) || {};
+    clearTimeout(timers.discuss);
+    timers.discuss = setTimeout(() => beginVoting(io, room), room.settings.discussSeconds * 1000);
+    roomTimers.set(room.code, timers);
+  }
 }
 
 function beginVoting(io: Server, room: Room) {
   room.state = 'VOTING';
   room.votes = [];
-  const deadlineAt = setDeadline(room, room.settings.votingSeconds);
+  const deadlineAt = room.settings.manualMode ? undefined : setDeadline(room, room.settings.votingSeconds);
   io.to(room.code).emit('round:phase', { state: 'VOTING', deadlineAt });
   emitSnapshot(io, room);
 
-  const timers = roomTimers.get(room.code) || {};
-  clearTimeout(timers.voting);
-  timers.voting = setTimeout(() => finishVoting(io, room), room.settings.votingSeconds * 1000);
-  roomTimers.set(room.code, timers);
+  if (!room.settings.manualMode) {
+    const timers = roomTimers.get(room.code) || {};
+    clearTimeout(timers.voting);
+    timers.voting = setTimeout(() => finishVoting(io, room), room.settings.votingSeconds * 1000);
+    roomTimers.set(room.code, timers);
+  }
 }
 
 export function submitVote(io: Server, room: Room, voterId: string, targetId: string) {
@@ -195,7 +207,16 @@ export function submitVote(io: Server, room: Room, voterId: string, targetId: st
   emitSnapshot(io, room);
 
   const activePlayers = room.players.filter((p) => p.connected);
-  if (room.votes.length >= activePlayers.length) finishVoting(io, room);
+  if (room.votes.length >= activePlayers.length) {
+    // If all votes are in before the voting timer fires, cancel the timer
+    const timers = roomTimers.get(room.code);
+    if (timers?.voting) {
+      clearTimeout(timers.voting);
+      timers.voting = undefined;
+      roomTimers.set(room.code, timers);
+    }
+    finishVoting(io, room);
+  }
 }
 
 function finishVoting(io: Server, room: Room) {
@@ -258,6 +279,29 @@ function finishVoting(io: Server, room: Room) {
     }, room.settings.suspenseMsQuestions);
   }, 300);
   emitSnapshot(io, room);
+}
+
+export function advancePhase(io: Server, room: Room) {
+  if (room.settings.manualMode !== true) return;
+  switch (room.state) {
+    case 'ANSWERING':
+      revealAnswers(io, room);
+      break;
+    case 'REVEAL_ANSWERS':
+      beginDiscuss(io, room);
+      break;
+    case 'DISCUSS':
+      beginVoting(io, room);
+      break;
+    case 'VOTING':
+      finishVoting(io, room);
+      break;
+    case 'RESULTS':
+      // host should use nextRound
+      break;
+    default:
+      break;
+  }
 }
 
 export function updateSettings(room: Room, partial: Partial<RoomSettings>) {

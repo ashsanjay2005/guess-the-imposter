@@ -15,6 +15,8 @@ const DEFAULT_SETTINGS: RoomSettings = {
   suspenseMsQuestions: 400,
   suspenseMsWinner: 700,
   suspenseMsImposter: 800,
+  manualMode: false,
+  lockAfterStart: false,
 };
 
 export class RoomManager {
@@ -101,7 +103,7 @@ export class RoomManager {
       return { room, player: existing };
     }
 
-    if (room.state !== 'LOBBY') {
+    if (room.state !== 'LOBBY' && room.settings.lockAfterStart) {
       // After game start, only allow spectators (no new players)
       const spectator: Player = { id: playerId, name, isHost: false, connected: true };
       room.spectators.push(spectator);

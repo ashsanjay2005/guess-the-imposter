@@ -1,7 +1,7 @@
 import React from 'react';
 import type { Player } from '../lib/types';
 
-export const PlayerAvatar: React.FC<{ player: Player; highlight?: boolean; isHost?: boolean; isYou?: boolean; dim?: boolean }> = ({ player, highlight, isHost, isYou, dim }) => {
+export const PlayerAvatar: React.FC<{ player: Player; highlight?: boolean; isHost?: boolean; isYou?: boolean; dim?: boolean; answered?: boolean }> = ({ player, highlight, isHost, isYou, dim, answered }) => {
   const initials = player.name
     .split(' ')
     .map((s) => s[0])
@@ -18,6 +18,9 @@ export const PlayerAvatar: React.FC<{ player: Player; highlight?: boolean; isHos
         <div className="text-xs text-slate-400">{player.connected ? 'online' : 'offline'}</div>
       </div>
       {isYou && <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-slate-600">You ✎</span>}
+      {typeof answered === 'boolean' && (
+        <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${answered ? 'bg-emerald-600' : 'bg-slate-600'}`}>{answered ? 'answered' : 'pending'}</span>
+      )}
       {isHost && <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-amber-600">Host</span>}
     </div>
   );

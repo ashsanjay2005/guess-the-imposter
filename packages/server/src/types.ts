@@ -34,6 +34,8 @@ export type RoomSettings = {
   suspenseMsQuestions: number; // delay before showing questions in results
   suspenseMsWinner: number; // delay after questions before winner
   suspenseMsImposter: number; // delay after winner before imposter id
+  manualMode: boolean; // if true, timers disabled, host advances
+  lockAfterStart: boolean; // lock seats after game start
 };
 
 export type Room = {

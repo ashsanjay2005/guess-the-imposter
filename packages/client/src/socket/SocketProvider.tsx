@@ -18,7 +18,7 @@ type Snapshot = Pick<
   | 'questionBank'
 >;
 
-type Toast = { type: 'info' | 'error' | 'success'; message: string };
+type Toast = { id: string; type: 'info' | 'error' | 'success'; message: string };
 
 type Ctx = {
   socket: Socket | null;
@@ -28,6 +28,7 @@ type Ctx = {
   yourQuestion?: string;
   deadlineAt?: number;
   answersRevealed: string[];
+  answersMajorityQuestion?: string;
   questionsRevealed?: { majorityQuestion: string; imposterQuestion: string };
   roundResults?: { imposterId: string; votes: { voterId: string; targetId: string }[]; majorityWon: boolean; scores: { majority: number; imposter: number } };
   createRoom: (name: string) => Promise<{ code: string; player: Player }>;
@@ -58,6 +59,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [yourQuestion, setYourQuestion] = useState<string | undefined>();
   const [deadlineAt, setDeadlineAt] = useState<number | undefined>();
   const [answersRevealed, setAnswersRevealed] = useState<string[]>([]);
+  const [answersMajorityQuestion, setAnswersMajorityQuestion] = useState<string | undefined>();
   const [questionsRevealed, setQuestionsRevealed] = useState<{
     majorityQuestion: string;
     imposterQuestion: string;
@@ -86,18 +88,28 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     if (!socket) return;
     const onUpdate = (snapshot: Snapshot) => setRoom(snapshot);
-    const onToast = (t: Toast) => setToasts((prev) => [...prev, t]);
+    const onToast = (t: Omit<Toast, 'id'>) => {
+      const toast = { id: Math.random().toString(36).slice(2), ...t } as Toast;
+      setToasts((prev) => [...prev, toast]);
+      // auto-dismiss after 2.5s
+      setTimeout(() => {
+        setToasts((prev) => prev.filter((p) => p.id !== toast.id));
+      }, 2500);
+    };
     const onPhase = (payload: any) => {
       setDeadlineAt(payload.deadlineAt);
       if (payload.state === 'ANSWERING') setYourQuestion(payload.yourQuestion);
     };
-    const onAnswers = (payload: { answers: string[] }) => setAnswersRevealed(payload.answers);
+    const onAnswers = (payload: { answers: string[]; majorityQuestion?: string }) => {
+      setAnswersRevealed(payload.answers);
+      setAnswersMajorityQuestion(payload.majorityQuestion);
+    };
     const onQuestions = (payload: { majorityQuestion: string; imposterQuestion: string }) =>
       setQuestionsRevealed(payload);
     const onResults = (payload: any) => setRoundResults(payload);
     const onConnectError = (err: any) => setToasts((prev) => [...prev, { type: 'error', message: `Socket error: ${err?.message ?? 'connection failed'}` }]);
     socket.on('room:update', onUpdate);
-    socket.on('toast', onToast);
+    socket.on('toast', onToast as any);
     socket.on('round:phase', onPhase);
     socket.on('round:answersRevealed', onAnswers);
     socket.on('round:questionsRevealed', onQuestions);
@@ -141,6 +153,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     yourQuestion,
     deadlineAt,
     answersRevealed,
+    answersMajorityQuestion,
     questionsRevealed,
     roundResults,
     async createRoom(name: string) {
@@ -153,6 +166,12 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     },
     async joinRoom(code: string, name: string) {
       const resp = await new Promise<any>((resolve) => socket!.emit('room:join', { code, name }, resolve));
+      if (resp?.error) {
+        const toast = { id: Math.random().toString(36).slice(2), type: 'error' as const, message: resp.error };
+        setToasts((prev) => [...prev, toast]);
+        setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== toast.id)), 2500);
+        throw new Error(resp.error);
+      }
       if (resp?.player) setMe(resp.player);
       localStorage.setItem('name', name);
       localStorage.setItem('lastRoomCode', code);

@@ -12,7 +12,8 @@ export const ResultsCard: React.FC<{
   readyCount?: string[];
   onReadyToggle?: (ready: boolean) => void;
   isHost?: boolean;
-}> = ({ players, imposterId, votes, majorityWon, playerScores, questions, onNextRound, readyCount, onReadyToggle, isHost }) => {
+  myId?: string;
+}> = ({ players, imposterId, votes, majorityWon, playerScores, questions, onNextRound, readyCount, onReadyToggle, isHost, myId }) => {
   const imposter = players.find((p) => p.id === imposterId);
   const voteLines = votes.map((v, i) => {
     const voter = players.find((p) => p.id === v.voterId)?.name ?? 'Unknown';
@@ -22,8 +23,9 @@ export const ResultsCard: React.FC<{
     );
   });
   const sorted = [...players].sort((a, b) => (playerScores[b.id] ?? 0) - (playerScores[a.id] ?? 0));
+  const youAreReady = readyCount?.includes(myId ?? '') ?? false;
   return (
-    <div className="card p-4 space-y-3">
+    <div className="card p-4 space-y-3 transition-opacity duration-300 animate-[fadeIn_0.3s_ease-out]">
       <div className="text-xl font-semibold">{majorityWon ? 'Majority wins!' : 'Imposter wins!'}</div>
       <div className="space-y-2">
         <div className="text-slate-300">Imposter was: <span className="font-medium">{imposter?.name}</span></div>
@@ -46,14 +48,15 @@ export const ResultsCard: React.FC<{
           ))}
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        <button className="secondary" onClick={() => onReadyToggle?.(true)} title="R">Ready</button>
-        <button className="secondary" onClick={() => onReadyToggle?.(false)}>Unready</button>
+      <div className="flex items-center gap-2 transition-transform duration-300">
+        <button className={`secondary ${youAreReady ? 'opacity-60 pointer-events-none' : ''}`} onClick={() => onReadyToggle?.(true)} title="R">{youAreReady ? 'Ready ✓' : 'Ready'}</button>
+        <button className="secondary" onClick={() => onReadyToggle?.(false)} disabled={!youAreReady}>Unready</button>
         {isHost && readyCount && (
           <span className="text-sm text-slate-400">Ready: {readyCount.length}/{players.length}</span>
         )}
         {onNextRound && <button className="primary" onClick={onNextRound} disabled={!!readyCount && readyCount.length !== players.length}>Next Round</button>}
       </div>
+      {youAreReady && <div className="text-xs text-emerald-400">You are marked ready</div>}
     </div>
   );
 };

@@ -3,6 +3,8 @@ import http from 'http';
 import cors from 'cors';
 import { Server } from 'socket.io';
 import { z } from 'zod';
+import fs from 'fs';
+import path from 'path';
 import { roomManager } from './roomManager';
 import type { Room } from './types';
 import {
@@ -12,13 +14,38 @@ import {
   submitAnswer,
   submitVote,
   updateSettings,
+  advancePhase,
 } from './stateMachine';
 
 export function createApp() {
   const app = express();
   app.use(cors());
+  app.use(express.json({ limit: '1mb' }));
   app.get('/', (_req, res) => {
     res.json({ ok: true, service: 'Guess the Imposter server' });
+  });
+  // Persist question bank and settings for dev convenience
+  app.post('/persist/:code', (req, res) => {
+    try {
+      const dir = path.join(process.cwd(), 'tmp');
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir);
+      fs.writeFileSync(path.join(dir, `${req.params.code}.json`), JSON.stringify(req.body, null, 2));
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(500).json({ ok: false });
+    }
+  });
+  app.get('/persist/:code', (req, res) => {
+    try {
+      const p = path.join(process.cwd(), 'tmp', `${req.params.code}.json`);
+      if (fs.existsSync(p)) {
+        res.type('application/json').send(fs.readFileSync(p));
+      } else {
+        res.status(404).json({ ok: false });
+      }
+    } catch (e) {
+      res.status(500).json({ ok: false });
+    }
   });
   return app;
 }
@@ -65,7 +92,8 @@ export function createServer(port = 4000) {
       const schema = z.object({ name: z.string().min(2).max(16) });
       const { name } = schema.parse(payload);
       const sessionId = (socket.handshake.headers['x-session-id'] as string) || socket.id;
-      const room = roomManager.createRoom(name, socket.id, sessionId);
+      const clean = name.replace(/[^a-zA-Z0-9 _-]/g, '');
+      const room = roomManager.createRoom(clean, socket.id, sessionId);
       socket.join(room.code);
       cb({ code: room.code, player: room.players[0] });
       emitSnapshot(room);
@@ -75,9 +103,10 @@ export function createServer(port = 4000) {
       const schema = z.object({ code: z.string().length(6), name: z.string().min(2).max(16) });
       const { code, name } = schema.parse(payload);
       const sessionId = (socket.handshake.headers['x-session-id'] as string) || socket.id;
+      const clean = name.replace(/[^a-zA-Z0-9 _-]/g, '');
       const { room, player, error } = roomManager.joinRoom(
         code.toUpperCase(),
-        name,
+        clean,
         socket.id,
         sessionId,
       );
@@ -134,12 +163,19 @@ export function createServer(port = 4000) {
       nextRound(io, room);
     });
 
+    socket.on('host:advance', () => {
+      const room = roomManager.getRoomByPlayer(socket.id);
+      if (!room) return;
+      if (room.hostId !== socket.id) return;
+      advancePhase(io, room);
+    });
+
     socket.on('host:updateSettings', (partial: Partial<Room['settings']>) => {
       const room = roomManager.getRoomByPlayer(socket.id);
       if (!room) return;
       if (room.hostId !== socket.id) return;
       updateSettings(room, partial);
-      io.to(room.code).emit('toast', { type: 'success', message: 'Settings updated' });
+      io.to(room.code).emit('toast', { type: 'success', message: 'Saved' });
       io.to(room.code).emit('room:update', {
         code: room.code,
         hostId: room.hostId,
@@ -238,7 +274,8 @@ export function createServer(port = 4000) {
       if (!room) return;
       const player = room.players.find((p) => p.id === socket.id);
       if (!player) return;
-      const entry = { id: String(Date.now() + Math.random()), name: player.name, text: String(text).slice(0, 120), ts: Date.now(), type: type ?? 'msg' as const };
+      const filtered = String(text).replace(/(fuck|shit|bitch|asshole)/gi, '****').slice(0, 120);
+      const entry = { id: String(Date.now() + Math.random()), name: player.name, text: filtered, ts: Date.now(), type: type ?? 'msg' as const };
       room.chat.push(entry);
       io.to(room.code).emit('room:update', {
         code: room.code,

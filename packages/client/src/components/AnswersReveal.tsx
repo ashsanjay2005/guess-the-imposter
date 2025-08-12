@@ -1,9 +1,16 @@
 import React from 'react';
 
-export const AnswersReveal: React.FC<{ answers: string[] }>= ({ answers }) => {
+export const AnswersReveal: React.FC<{ answers: string[]; majorityQuestion?: string }>= ({ answers, majorityQuestion }) => {
   return (
     <div className="card p-4">
-      <div className="text-slate-300 text-sm mb-2">Answers</div>
+      {majorityQuestion ? (
+        <div className="mb-4 p-3 rounded-xl bg-indigo-900/40 border border-indigo-600">
+          <div className="text-[11px] uppercase tracking-wide text-indigo-300 mb-1">Majority Question</div>
+          <div className="text-lg font-semibold text-indigo-100">{majorityQuestion}</div>
+        </div>
+      ) : (
+        <div className="text-slate-300 text-sm mb-2">Answers</div>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {answers.map((a, i) => {
           const idx = a.indexOf(':');
