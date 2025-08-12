@@ -45,6 +45,8 @@ export function createServer(port = 4000) {
       playerScores: room.playerScores,
       answers: room.answers,
       votes: room.votes,
+      readyPlayerIds: room.readyPlayerIds,
+      chat: room.chat,
       settings: room.settings,
       questionBank: room.questionBank,
     });
@@ -95,6 +97,8 @@ export function createServer(port = 4000) {
         playerScores: room.playerScores,
         answers: room.answers,
         votes: room.votes,
+        readyPlayerIds: room.readyPlayerIds,
+        chat: room.chat,
         settings: room.settings,
         questionBank: room.questionBank,
       }, player });
@@ -147,6 +151,8 @@ export function createServer(port = 4000) {
         playerScores: room.playerScores,
         answers: room.answers,
         votes: room.votes,
+        readyPlayerIds: room.readyPlayerIds,
+        chat: room.chat,
         settings: room.settings,
         questionBank: room.questionBank,
       });
@@ -170,6 +176,8 @@ export function createServer(port = 4000) {
         playerScores: room.playerScores,
         answers: room.answers,
         votes: room.votes,
+        readyPlayerIds: room.readyPlayerIds,
+        chat: room.chat,
         settings: room.settings,
         questionBank: room.questionBank,
       });
@@ -209,6 +217,45 @@ export function createServer(port = 4000) {
       if (!room) return;
       submitVote(io, room, socket.id, targetId);
       io.to(socket.id).emit('toast', { type: 'success', message: 'Vote received' });
+    });
+
+    socket.on('player:ready', ({ ready }: { ready: boolean }) => {
+      const room = roomManager.getRoomByPlayer(socket.id);
+      if (!room) return;
+      const set = new Set(room.readyPlayerIds);
+      if (ready) set.add(socket.id); else set.delete(socket.id);
+      room.readyPlayerIds = [...set];
+      emitSnapshot(room);
+      const activePlayers = room.players.filter((p) => p.connected).map((p) => p.id);
+      const allReady = activePlayers.every((id) => set.has(id));
+      if (room.state === 'RESULTS' && allReady) {
+        nextRound(io, room);
+      }
+    });
+
+    socket.on('chat:send', ({ text, type }: { text: string; type?: 'msg' | 'reaction' }) => {
+      const room = roomManager.getRoomByPlayer(socket.id);
+      if (!room) return;
+      const player = room.players.find((p) => p.id === socket.id);
+      if (!player) return;
+      const entry = { id: String(Date.now() + Math.random()), name: player.name, text: String(text).slice(0, 120), ts: Date.now(), type: type ?? 'msg' as const };
+      room.chat.push(entry);
+      io.to(room.code).emit('room:update', {
+        code: room.code,
+        hostId: room.hostId,
+        players: room.players,
+        spectators: room.spectators,
+        state: room.state,
+        round: room.round,
+        scores: room.scores,
+        playerScores: room.playerScores,
+        answers: room.answers,
+        votes: room.votes,
+        readyPlayerIds: room.readyPlayerIds,
+        chat: room.chat,
+        settings: room.settings,
+        questionBank: room.questionBank,
+      });
     });
 
     socket.on('player:updateName', ({ name }: { name: string }) => {

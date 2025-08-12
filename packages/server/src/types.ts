@@ -31,6 +31,9 @@ export type RoomSettings = {
   votingSeconds: number;
   showNamesWithAnswers: boolean;
   randomizeAnswerOrder: boolean;
+  suspenseMsQuestions: number; // delay before showing questions in results
+  suspenseMsWinner: number; // delay after questions before winner
+  suspenseMsImposter: number; // delay after winner before imposter id
 };
 
 export type Room = {
@@ -46,7 +49,8 @@ export type Room = {
   imposterId?: string;
   answers: { playerId: string; text: string }[];
   votes: { voterId: string; targetId: string }[];
-  readyPlayerIds?: string[];
+  readyPlayerIds: string[];
+  chat: { id: string; name: string; text: string; ts: number; type: 'msg' | 'reaction' }[];
   settings: RoomSettings;
   questionBank: QuestionPair[];
 };
@@ -64,6 +68,7 @@ export type PublicRoomSnapshot = Pick<
   | 'answers'
   | 'votes'
   | 'readyPlayerIds'
+  | 'chat'
   | 'settings'
   | 'questionBank'
 > & { answeringPlayerIds?: string[] };

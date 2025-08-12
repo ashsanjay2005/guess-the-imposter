@@ -13,6 +13,7 @@ type Snapshot = Pick<
   | 'scores'
   | 'answers'
   | 'votes'
+  | 'chat'
   | 'settings'
   | 'questionBank'
 >;
@@ -36,6 +37,9 @@ type Ctx = {
   nextRound: () => void;
   sendAnswer: (text: string) => void;
   sendVote: (targetId: string) => void;
+  sendChat: (text: string) => void;
+  sendReaction: (emoji: string) => void;
+  readyToggle: (ready: boolean) => void;
   updateSettings: (partial: Partial<RoomSettings>) => void;
   upsertQuestionPair: (pair: QuestionPair) => Promise<void>;
   deleteQuestionPair: (id: string) => Promise<void>;
@@ -59,6 +63,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     imposterQuestion: string;
   } | undefined>();
   const [roundResults, setRoundResults] = useState<Ctx['roundResults']>(undefined);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     const serverUrl = (import.meta as any).env?.VITE_SERVER_URL ?? 'http://localhost:4000';
@@ -179,6 +184,16 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     },
     updateSettings(partial: Partial<RoomSettings>) {
       socket?.emit('host:updateSettings', partial);
+    },
+    sendChat(text: string) {
+      if (!text.trim()) return;
+      socket?.emit('chat:send', { text, type: 'msg' });
+    },
+    sendReaction(emoji: string) {
+      socket?.emit('chat:send', { text: emoji, type: 'reaction' });
+    },
+    readyToggle(ready: boolean) {
+      socket?.emit('player:ready', { ready });
     },
     async upsertQuestionPair(pair: QuestionPair) {
       await new Promise<void>((resolve) => socket?.emit('host:upsertQuestionPair', pair, () => resolve()));

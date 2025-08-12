@@ -9,7 +9,10 @@ export const ResultsCard: React.FC<{
   playerScores: Record<string, number>;
   questions?: { majorityQuestion: string; imposterQuestion: string };
   onNextRound?: () => void;
-}> = ({ players, imposterId, votes, majorityWon, playerScores, questions, onNextRound }) => {
+  readyCount?: string[];
+  onReadyToggle?: (ready: boolean) => void;
+  isHost?: boolean;
+}> = ({ players, imposterId, votes, majorityWon, playerScores, questions, onNextRound, readyCount, onReadyToggle, isHost }) => {
   const imposter = players.find((p) => p.id === imposterId);
   const voteLines = votes.map((v, i) => {
     const voter = players.find((p) => p.id === v.voterId)?.name ?? 'Unknown';
@@ -43,7 +46,14 @@ export const ResultsCard: React.FC<{
           ))}
         </div>
       </div>
-      {onNextRound && <button className="primary" onClick={onNextRound}>Next Round</button>}
+      <div className="flex items-center gap-2">
+        <button className="secondary" onClick={() => onReadyToggle?.(true)} title="R">Ready</button>
+        <button className="secondary" onClick={() => onReadyToggle?.(false)}>Unready</button>
+        {isHost && readyCount && (
+          <span className="text-sm text-slate-400">Ready: {readyCount.length}/{players.length}</span>
+        )}
+        {onNextRound && <button className="primary" onClick={onNextRound} disabled={!!readyCount && readyCount.length !== players.length}>Next Round</button>}
+      </div>
     </div>
   );
 };

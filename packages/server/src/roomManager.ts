@@ -12,6 +12,9 @@ const DEFAULT_SETTINGS: RoomSettings = {
   votingSeconds: 30,
   showNamesWithAnswers: true,
   randomizeAnswerOrder: true,
+  suspenseMsQuestions: 400,
+  suspenseMsWinner: 700,
+  suspenseMsImposter: 800,
 };
 
 export class RoomManager {
@@ -34,6 +37,7 @@ export class RoomManager {
       answers: [],
       votes: [],
       readyPlayerIds: [],
+      chat: [],
       settings: { ...DEFAULT_SETTINGS },
       questionBank: [...SEED_PAIRS],
     };

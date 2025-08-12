@@ -36,6 +36,8 @@ function emitSnapshot(io: Server, room: Room) {
     playerScores: room.playerScores,
     answers: room.answers,
     votes: room.votes,
+    readyPlayerIds: room.readyPlayerIds,
+    chat: room.chat,
     settings: room.settings,
     questionBank: room.questionBank,
   };
@@ -69,6 +71,7 @@ export function nextRound(io: Server, room: Room) {
   room.round += 1;
   room.answers = [];
   room.votes = [];
+  room.readyPlayerIds = [];
   room.state = 'DISTRIBUTING';
   room.currentPair = roomManager.pickRandomPair(room);
   const imposter = chooseImposter(room);
@@ -250,10 +253,10 @@ function finishVoting(io: Server, room: Room) {
                 }
               : undefined,
           });
-        }, 900);
-      }, 900);
-    }, 800);
-  }, 600);
+        }, room.settings.suspenseMsImposter);
+      }, room.settings.suspenseMsWinner);
+    }, room.settings.suspenseMsQuestions);
+  }, 300);
   emitSnapshot(io, room);
 }
 

@@ -12,6 +12,7 @@ import type { Room } from '../lib/types';
 import { Toasts } from '../components/Toasts';
 import { HostSidebar } from '../components/HostSidebar';
 import { DiscussPanel } from '../components/DiscussPanel';
+import { ChatPanel } from '../components/ChatPanel';
 
 export const RoomPage: React.FC = () => {
   const { code } = useParams();
@@ -71,7 +72,7 @@ export const RoomPage: React.FC = () => {
               {isHost && room.state === 'RESULTS' && (
                 <button className="primary" onClick={nextRound}>Next Round</button>
               )}
-              <button className="secondary active:scale-[.98] transition" onClick={async () => { await navigator.clipboard.writeText(inviteUrl); setCopyOk('Link copied'); setTimeout(() => setCopyOk(null), 1500); }}>Copy Invite Link</button>
+              <button id="copyInviteRoom" className="secondary active:scale-[.98] transition" onClick={async () => { await navigator.clipboard.writeText(inviteUrl); const btn = document.getElementById('copyInviteRoom'); if (btn) { const orig = btn.textContent; btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = orig || 'Copy Invite Link'; }, 1500);} }}>Copy Invite Link</button>
             </div>
           </div>
           {copyOk && <div className="mt-2 text-xs text-emerald-400">{copyOk}</div>}
@@ -86,7 +87,7 @@ export const RoomPage: React.FC = () => {
             <div className="text-slate-300 text-sm mb-2">Players</div>
             <div className="grid sm:grid-cols-2 gap-2">
               {players.map((p) => (
-                <PlayerAvatar key={p.id} player={p} highlight={p.id === room.hostId} />
+                <PlayerAvatar key={p.id} player={p} highlight={p.id === room.hostId} isHost={p.id === room.hostId} isYou={p.name === name} dim={room.state === 'ANSWERING' && !(room.answers || []).some((a: any) => a.playerId === p.id)} />
               ))}
             </div>
             <div className="text-slate-400 text-xs mt-2">Need exactly 4 players to start</div>
@@ -119,6 +120,7 @@ export const RoomPage: React.FC = () => {
 
       <div className="space-y-4">
         {isHost && <HostSidebar room={room as Room} />}
+        <ChatPanel />
         {!isHost && (
           <div className="card p-4">
             <div className="font-medium">Waiting for host</div>
@@ -133,8 +135,12 @@ export const RoomPage: React.FC = () => {
 const ResultsLive: React.FC = () => {
   const { room, nextRound, roundResults } = useSocket();
   if (!room || !roundResults) return null;
+  const { socket } = useSocket() as any;
+  const readyIds = (room as any).readyPlayerIds || [];
+  const meId = (room as any).players.find((p: any) => p.name === (localStorage.getItem('name') || ''))?.id;
+  const isHost = (room as any).hostId === meId;
   return (
-    <ResultsCard players={room.players} imposterId={roundResults.imposterId} votes={roundResults.votes} majorityWon={roundResults.majorityWon} playerScores={(room as any).playerScores ?? {}} questions={roundResults.questions} onNextRound={nextRound} />
+    <ResultsCard players={room.players} imposterId={roundResults.imposterId} votes={roundResults.votes} majorityWon={roundResults.majorityWon} playerScores={(room as any).playerScores ?? {}} questions={roundResults.questions} onNextRound={nextRound} readyCount={readyIds} onReadyToggle={(ready) => socket.emit('player:ready', { ready })} isHost={isHost} />
   );
 };
 

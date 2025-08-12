@@ -31,6 +31,9 @@ export type RoomSettings = {
   votingSeconds: number;
   showNamesWithAnswers: boolean;
   randomizeAnswerOrder: boolean;
+  suspenseMsQuestions: number;
+  suspenseMsWinner: number;
+  suspenseMsImposter: number;
 };
 
 export type Room = {
@@ -46,6 +49,8 @@ export type Room = {
   imposterId?: string;
   answers: { playerId: string; text: string }[];
   votes: { voterId: string; targetId: string }[];
+  readyPlayerIds: string[];
+  chat: { id: string; name: string; text: string; ts: number; type: 'msg' | 'reaction' }[];
   settings: RoomSettings;
   questionBank: QuestionPair[];
 };

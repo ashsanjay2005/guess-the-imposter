@@ -41,12 +41,14 @@ export const Landing: React.FC = () => {
           <div>
             <button
               className="secondary mt-2 active:scale-[.98] transition"
-              onClick={() => {
+              onClick={async () => {
                 if (!code.trim()) return;
                 const url = `${window.location.origin}/room/${code.trim().toUpperCase()}`;
-                navigator.clipboard.writeText(url);
-                alert('Invite link copied!');
+                await navigator.clipboard.writeText(url);
+                const btn = document.getElementById('copyInviteLanding');
+                if (btn) { const original = btn.textContent; btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = original || 'Copy Invite Link'; }, 1500); }
               }}
+              id="copyInviteLanding"
             >Copy Invite Link</button>
           </div>
         </div>

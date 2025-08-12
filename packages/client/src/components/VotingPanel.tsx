@@ -1,8 +1,22 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import type { Player } from '../lib/types';
 
 export const VotingPanel: React.FC<{ players: Player[]; onVote: (id: string) => void }>= ({ players, onVote }) => {
   const [votedId, setVotedId] = React.useState<string | null>(null);
+  // Number keys 1-8 to vote
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (votedId) return;
+      const n = Number(e.key);
+      if (n >= 1 && n <= players.length) {
+        const target = players[n - 1];
+        onVote(target.id);
+        setVotedId(target.id);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [players, votedId, onVote]);
   return (
     <div className="card p-4 space-y-3">
       <div className="text-slate-300 text-sm">Vote for the Imposter</div>
