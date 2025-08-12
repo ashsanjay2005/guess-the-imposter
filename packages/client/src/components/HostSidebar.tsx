@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { QuestionPair, Room } from '../lib/types';
 import { useSocket } from '../socket/SocketProvider';
 import { Tooltip } from './Tooltip';
@@ -7,6 +7,30 @@ export const HostSidebar: React.FC<{ room: Room }> = ({ room }) => {
   const { updateSettings, upsertQuestionPair, deleteQuestionPair } = useSocket();
   const [pair, setPair] = useState<QuestionPair>({ id: '', majorityQuestion: '', imposterQuestion: '' });
   const [open, setOpen] = useState(true);
+  
+  const suspensePresets = useMemo(() => (
+    [
+      { key: 'off', label: 'Off (no delay)', q: 0, w: 0, i: 0 },
+      { key: 'short', label: 'Short', q: 500, w: 700, i: 700 },
+      { key: 'normal', label: 'Normal', q: 1000, w: 1250, i: 1500 },
+      { key: 'long', label: 'Long', q: 2000, w: 2000, i: 2500 },
+      { key: 'dramatic', label: 'Dramatic', q: 3000, w: 2500, i: 3000 },
+    ] as const
+  ), []);
+
+  const currentSuspensePreset = useMemo(() => {
+    const { suspenseMsQuestions: q, suspenseMsWinner: w, suspenseMsImposter: i } = room.settings;
+    const match = suspensePresets.find((p) => p.q === q && p.w === w && p.i === i);
+    return match?.key ?? 'custom';
+  }, [room.settings, suspensePresets]);
+
+  const [suspenseCustom, setSuspenseCustom] = useState(currentSuspensePreset === 'custom');
+  useEffect(() => {
+    // If settings change to match a known preset and user hasn't explicitly chosen custom, reflect that
+    if (currentSuspensePreset !== 'custom') {
+      setSuspenseCustom(false);
+    }
+  }, [currentSuspensePreset]);
 
   function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -76,18 +100,47 @@ export const HostSidebar: React.FC<{ room: Room }> = ({ room }) => {
         <input type="checkbox" className="mt-2" checked={room.settings.showNamesWithAnswers} onChange={(e) => updateSettings({ showNamesWithAnswers: e.target.checked })} />
         <label className="label">Randomize answers</label>
         <input type="checkbox" className="mt-2" checked={room.settings.randomizeAnswerOrder} onChange={(e) => updateSettings({ randomizeAnswerOrder: e.target.checked })} />
-        <div className="flex items-center gap-2"><label className="label">Reveal Q delay (ms)</label><Tooltip text="Delay before questions are shown in Results."/></div>
-        <input className="text" type="number" value={room.settings.suspenseMsQuestions} onChange={(e) => updateSettings({ suspenseMsQuestions: Number(e.target.value) })} />
-        <div className="flex items-center gap-2"><label className="label">Winner delay (ms)</label><Tooltip text="Delay between questions and winner announcement."/></div>
-        <input className="text" type="number" value={room.settings.suspenseMsWinner} onChange={(e) => updateSettings({ suspenseMsWinner: Number(e.target.value) })} />
-        <div className="flex items-center gap-2"><label className="label">Imposter delay (ms)</label><Tooltip text="Delay after winner before revealing the imposter."/></div>
-        <input className="text" type="number" value={room.settings.suspenseMsImposter} onChange={(e) => updateSettings({ suspenseMsImposter: Number(e.target.value) })} />
         <div className="flex items-center gap-2"><label className="label">Manual mode</label><Tooltip text="Disables phase timers. Host advances from Reveal Answers & Discuss. Answering/Voting end when all respond."/></div>
         <input type="checkbox" className="mt-2" checked={room.settings.manualMode} onChange={(e) => updateSettings({ manualMode: e.target.checked })} />
         <div className="flex items-center gap-2"><label className="label">Lock after start</label><Tooltip text="After the game starts, new joiners become spectators only."/></div>
         <input type="checkbox" className="mt-2" checked={room.settings.lockAfterStart} onChange={(e) => updateSettings({ lockAfterStart: e.target.checked })} />
         <label className="label">Auto-save after changes</label>
         <input type="checkbox" className="mt-2" onChange={(e) => { if (e.target.checked) handleSaveServer(); }} />
+      </div>
+
+      {/* Suspense section moved to bottom, above Question Bank */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="flex items-center gap-2"><label className="label">Suspense settings</label><Tooltip text="Preset delays for results reveal (questions → winner → imposter)."/></div>
+        <select
+          className="w-full px-4 py-2 rounded-xl bg-slate-700 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+          value={suspenseCustom ? 'custom' : currentSuspensePreset}
+          onChange={(e) => {
+            const key = e.target.value as 'custom' | typeof suspensePresets[number]['key'];
+            if (key === 'custom') {
+              setSuspenseCustom(true);
+              return;
+            }
+            const sel = suspensePresets.find((p) => p.key === key);
+            if (!sel) return;
+            setSuspenseCustom(false);
+            updateSettings({ suspenseMsQuestions: sel.q, suspenseMsWinner: sel.w, suspenseMsImposter: sel.i });
+          }}
+        >
+          <option value="custom">Custom</option>
+          {suspensePresets.map((p) => (
+            <option key={p.key} value={p.key}>{p.label}</option>
+          ))}
+        </select>
+        {suspenseCustom && (
+          <>
+            <div className="flex items-center gap-2"><label className="label">Reveal Q delay (ms)</label><Tooltip text="Delay before questions are shown in Results."/></div>
+            <input className="text" type="number" value={room.settings.suspenseMsQuestions} onChange={(e) => { setSuspenseCustom(true); updateSettings({ suspenseMsQuestions: Number(e.target.value) }); }} />
+            <div className="flex items-center gap-2"><label className="label">Winner delay (ms)</label><Tooltip text="Delay between questions and winner announcement."/></div>
+            <input className="text" type="number" value={room.settings.suspenseMsWinner} onChange={(e) => { setSuspenseCustom(true); updateSettings({ suspenseMsWinner: Number(e.target.value) }); }} />
+            <div className="flex items-center gap-2"><label className="label">Imposter delay (ms)</label><Tooltip text="Delay after winner before revealing the imposter."/></div>
+            <input className="text" type="number" value={room.settings.suspenseMsImposter} onChange={(e) => { setSuspenseCustom(true); updateSettings({ suspenseMsImposter: Number(e.target.value) }); }} />
+          </>
+        )}
       </div>
 
       <div className="space-y-2">

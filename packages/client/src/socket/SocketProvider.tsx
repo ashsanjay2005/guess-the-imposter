@@ -45,6 +45,7 @@ type Ctx = {
   upsertQuestionPair: (pair: QuestionPair) => Promise<void>;
   deleteQuestionPair: (id: string) => Promise<void>;
   clearTransient: () => void;
+  kickPlayer: (playerId: string) => void;
 };
 
 const SocketCtx = createContext<Ctx>(null as unknown as Ctx);
@@ -138,6 +139,21 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setQuestionsRevealed(payload);
     const onResults = (payload: any) => setRoundResults(payload);
     const onConnectError = (err: any) => setToasts((prev) => [...prev, { id: Math.random().toString(36).slice(2), type: 'error', message: `Socket error: ${err?.message ?? 'connection failed'}` }]);
+    const onKicked = () => {
+      setToasts((prev) => [...prev, { id: Math.random().toString(36).slice(2), type: 'error', message: 'You were removed by the host' }]);
+      sessionStorage.setItem('allowAutoReconnect', '0');
+      localStorage.removeItem('lastRoomCode');
+      setRoom(null);
+      setMe(null);
+      // Navigate immediately to landing without full reload so the toast stays visible
+      try {
+        window.history.pushState({}, '', '/guess-who');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      } catch {
+        const base = window.location.origin;
+        window.location.href = base + '/guess-who';
+      }
+    };
     socket.on('room:update', onUpdate);
     socket.on('toast', onToast as any);
     socket.on('round:phase', onPhase);
@@ -145,6 +161,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     socket.on('round:questionsRevealed', onQuestions);
     socket.on('round:results', onResults);
     socket.on('connect_error', onConnectError);
+    socket.on('kicked', onKicked);
     return () => {
       socket.off('room:update', onUpdate);
       socket.off('toast', onToast);
@@ -153,6 +170,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       socket.off('round:questionsRevealed', onQuestions);
       socket.off('round:results', onResults);
       socket.off('connect_error', onConnectError);
+      socket.off('kicked', onKicked);
     };
   }, [socket]);
 
@@ -267,6 +285,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setAnswersRevealed([]);
       setQuestionsRevealed(undefined);
       setRoundResults(undefined);
+    },
+    kickPlayer(playerId: string) {
+      socket?.emit('host:kick', { playerId });
     },
   }), [socket, me, room, toasts, yourQuestion, deadlineAt, answersRevealed, questionsRevealed]);
 

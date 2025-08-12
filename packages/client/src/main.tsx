@@ -6,9 +6,11 @@ import { Landing } from './pages/Landing';
 import { RoomPage } from './pages/RoomPage';
 import { AppLayout } from './AppLayout';
 import { SocketProvider } from './socket/SocketProvider';
+import { Home } from './pages/Home';
 
 const router = createBrowserRouter([
-  { path: '/', element: <AppLayout><Landing /></AppLayout> },
+  { path: '/', element: <AppLayout><Home /></AppLayout> },
+  { path: '/guess-who', element: <AppLayout><Landing /></AppLayout> },
   { path: '/room/:code', element: <AppLayout><RoomPage /></AppLayout> },
 ]);
 

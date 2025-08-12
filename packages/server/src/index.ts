@@ -259,6 +259,29 @@ export function createServer(port = 4000) {
       setTimeout(() => advancePhase(io, room), 3000);
     });
 
+    socket.on('host:kick', ({ playerId }: { playerId: string }, cb?: Function) => {
+      const room = roomManager.getRoomByPlayer(socket.id);
+      if (!room) return cb?.({ ok: false, error: 'No room' });
+      if (room.hostId !== socket.id) return cb?.({ ok: false, error: 'Not host' });
+      if (room.state !== 'LOBBY') return cb?.({ ok: false, error: 'Can only kick in lobby' });
+      if (playerId === room.hostId) return cb?.({ ok: false, error: 'Cannot kick host' });
+      const target = room.players.find((p) => p.id === playerId) || room.spectators.find((p) => p.id === playerId);
+      if (!target) return cb?.({ ok: false, error: 'Player not found' });
+      const { kickedPlayer } = roomManager.kickPlayer(playerId);
+      if (kickedPlayer) {
+        const targetSocket = io.sockets.sockets.get(playerId);
+        if (targetSocket) {
+          targetSocket.emit('kicked', { code: room.code });
+          targetSocket.leave(room.code);
+        }
+        io.to(room.code).emit('toast', { type: 'info', message: `${kickedPlayer.name} was removed by host` });
+        emitSnapshot(room);
+        cb?.({ ok: true });
+      } else {
+        cb?.({ ok: false, error: 'Unable to kick' });
+      }
+    });
+
     socket.on('host:updateSettings', (partial: Partial<Room['settings']>) => {
       const room = roomManager.getRoomByPlayer(socket.id);
       if (!room) return;

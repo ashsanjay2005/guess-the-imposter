@@ -12,9 +12,9 @@ const DEFAULT_SETTINGS: RoomSettings = {
   votingSeconds: 30,
   showNamesWithAnswers: true,
   randomizeAnswerOrder: true,
-  suspenseMsQuestions: 400,
-  suspenseMsWinner: 700,
-  suspenseMsImposter: 800,
+  suspenseMsQuestions: 0,
+  suspenseMsWinner: 0,
+  suspenseMsImposter: 0,
   manualMode: false,
   lockAfterStart: false,
 };
@@ -154,6 +154,36 @@ export class RoomManager {
       const left = room.spectators[sIdx];
       left.connected = false;
       return { room, leftPlayer: left };
+    }
+    return { room };
+  }
+
+  kickPlayer(playerId: string): { room?: Room; kickedPlayer?: Player } {
+    const room = this.getRoomByPlayer(playerId);
+    if (!room) return {};
+    // Remove mapping
+    this.playerToRoom.delete(playerId);
+    // Remove from sessions for this room
+    const sessions = this.roomSessions.get(room.code);
+    if (sessions) {
+      for (const [sid, pid] of sessions.entries()) {
+        if (pid === playerId) sessions.delete(sid);
+      }
+    }
+    // Remove from players
+    const idx = room.players.findIndex((p) => p.id === playerId);
+    if (idx >= 0) {
+      const kickedPlayer = room.players[idx];
+      // Do not alter host here; caller should prevent kicking host
+      room.players.splice(idx, 1);
+      return { room, kickedPlayer };
+    }
+    // Or from spectators
+    const sIdx = room.spectators.findIndex((p) => p.id === playerId);
+    if (sIdx >= 0) {
+      const kickedPlayer = room.spectators[sIdx];
+      room.spectators.splice(sIdx, 1);
+      return { room, kickedPlayer };
     }
     return { room };
   }

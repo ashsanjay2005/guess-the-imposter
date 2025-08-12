@@ -1,7 +1,7 @@
 import React from 'react';
 import type { Player } from '../lib/types';
 
-export const PlayerAvatar: React.FC<{ player: Player; highlight?: boolean; isHost?: boolean; isYou?: boolean; dim?: boolean; answered?: boolean }> = ({ player, highlight, isHost, isYou, dim, answered }) => {
+export const PlayerAvatar: React.FC<{ player: Player; highlight?: boolean; isHost?: boolean; isYou?: boolean; dim?: boolean; answered?: boolean; onKick?: () => void }> = ({ player, highlight, isHost, isYou, dim, answered, onKick }) => {
   const initials = player.name
     .split(' ')
     .map((s) => s[0])
@@ -22,6 +22,9 @@ export const PlayerAvatar: React.FC<{ player: Player; highlight?: boolean; isHos
         <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${answered ? 'bg-emerald-600' : 'bg-slate-600'}`}>{answered ? 'answered' : 'pending'}</span>
       )}
       {isHost && <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-amber-600">Host</span>}
+      {onKick && !isYou && (
+        <button className="ml-auto text-xs px-2 py-1 rounded-lg bg-red-600 hover:bg-red-500" onClick={onKick} title="Kick player">Kick</button>
+      )}
     </div>
   );
 };

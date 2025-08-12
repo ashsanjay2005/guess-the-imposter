@@ -32,6 +32,7 @@ export const RoomPage: React.FC = () => {
     sendVote,
     socket,
     readyToggle,
+    kickPlayer,
   } = useSocket() as any;
 
   const [name, setName] = useState(() => localStorage.getItem('name') || `Player${Math.floor(Math.random()*100)}`);
@@ -150,8 +151,18 @@ export const RoomPage: React.FC = () => {
             <div className="grid sm:grid-cols-2 gap-2">
               {players.map((p) => {
                 const answered = (room.answers || []).some((a: any) => a.playerId === p.id);
+                const canKick = isHost && room.state === 'LOBBY' && p.id !== room.hostId;
                 return (
-                  <PlayerAvatar key={p.id} player={p} highlight={p.id === room.hostId} isHost={p.id === room.hostId} isYou={p.name === name} dim={room.state === 'ANSWERING' && !answered} answered={room.state === 'ANSWERING' ? answered : undefined} />
+                  <PlayerAvatar
+                    key={p.id}
+                    player={p}
+                    highlight={p.id === room.hostId}
+                    isHost={p.id === room.hostId}
+                    isYou={p.name === name}
+                    dim={room.state === 'ANSWERING' && !answered}
+                    answered={room.state === 'ANSWERING' ? answered : undefined}
+                    onKick={canKick ? () => kickPlayer(p.id) : undefined}
+                  />
                 );
               })}
             </div>
