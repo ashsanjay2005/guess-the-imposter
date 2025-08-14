@@ -21,20 +21,19 @@ export const Home: React.FC = () => {
             </div>
           </Link>
 
-          {/* Placeholder tiles for future games */}
-          <div className="card p-4 opacity-60 select-none">
+          <Link to="/mafia" className="card p-4 hover:bg-slate-700/60 transition">
             <div className="flex items-center gap-4">
-              <div className="text-3xl" aria-hidden>🎲</div>
+              <div className="text-3xl" aria-hidden>🧛‍♂️</div>
               <div>
-                <div className="font-semibold">More games coming soon</div>
-                <div className="text-sm text-slate-400">Stay tuned</div>
+                <div className="font-semibold">Mafia / Werewolf</div>
+                <div className="text-sm text-slate-400">Automated narrator with roles & phases</div>
               </div>
             </div>
-          </div>
+          </Link>
         </div>
 
         <div className="text-center text-xs text-slate-400 mt-6">
-          Shareable room links for each game still work, e.g. <code>/room/ABCDEF</code> for Guess Who.
+          Shareable room links per game: <code>/room/ABCDEF</code> (Guess Who), <code>/mafia/room/ABCDEF</code> (Mafia).
         </div>
       </div>
     </div>

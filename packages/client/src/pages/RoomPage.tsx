@@ -100,7 +100,9 @@ export const RoomPage: React.FC = () => {
               {isHost && room.state === 'RESULTS' && (
                 <button className="primary" onClick={nextRound}>Next Round</button>
               )}
+              {room.state === 'LOBBY' && <a className="secondary" href="/guess-who">← Back</a>}
               <button className="secondary" onClick={() => setShowHowTo(true)}>How to play</button>
+              <a className="secondary" href="/">Back to games</a>
               <button
                 id="copyInviteRoom"
                 className="secondary active:scale-[.98] transition"

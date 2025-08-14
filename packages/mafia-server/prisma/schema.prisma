@@ -1,0 +1,92 @@
+// Prisma schema for Mafia/Werewolf game
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Room {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  hostId    String
+  settings  String
+  phase     String
+  dayNumber Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  players   Player[]
+  roles     Role[]
+  actions   Action[]
+  votes     Vote[]
+  logs      EventLog[]
+}
+
+model Player {
+  id            String   @id @default(cuid())
+  roomId        String
+  name          String
+  isHost        Boolean  @default(false)
+  isAlive       Boolean  @default(true)
+  seat          Int
+  connectionId  String?
+  lastSeenAt    DateTime @default(now())
+
+  room          Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  role          Role?
+}
+
+model Role {
+  id         String    @id @default(cuid())
+  roomId     String
+  playerId   String?   @unique
+  roleType   String
+  alignment  String
+  isRevealed Boolean   @default(false)
+
+  room       Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  player     Player?   @relation(fields: [playerId], references: [id])
+}
+
+model Action {
+  id             String    @id @default(cuid())
+  roomId         String
+  nightNumber    Int
+  actorPlayerId  String
+  targetPlayerId String?
+  type           String
+  payload        String?
+  resolvedAt     DateTime?
+
+  room           Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+}
+
+model Vote {
+  id        String   @id @default(cuid())
+  roomId    String
+  dayNumber Int
+  voterId   String
+  nomineeId String?
+  value     String
+  finalizedAt DateTime?
+
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+}
+
+model EventLog {
+  id        String   @id @default(cuid())
+  roomId    String
+  phase     String
+  message   String
+  meta      String?
+  createdAt DateTime @default(now())
+
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+}
+
+

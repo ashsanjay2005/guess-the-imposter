@@ -2,10 +2,63 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: dark; }
+:root {
+  color-scheme: dark;
+  /* Theme tokens (default Day) */
+  --bg: #0f172a;
+  --surface: #141c2f;
+  --border: #233047;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --accent: #60a5fa;
+  --accent-contrast: #0b1220;
+  --glow: rgba(96,165,250,.25);
+  --focus: rgba(96,165,250,.45);
+  transition: background-color .3s ease, color .3s ease, border-color .3s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { transition: none; }
+}
+
+[data-phase="NIGHT"] {
+  --bg: #07111f;
+  --surface: #0e1a2a;
+  --border: #1f2b3b;
+  --text: #c9d7f3;
+  --muted: #9fb0d2;
+  --accent: #7c4dff;
+  --accent-contrast: #0b1220;
+  --glow: rgba(124,77,255,.25);
+  --focus: rgba(124,77,255,.4);
+}
+
+[data-phase="DAWN"] {
+  --bg: radial-gradient(120% 120% at 50% -10%, #1c2632 0%, #0e1b25 35%, #0b1220 80%);
+  --surface: #1c2632;
+  --border: #2b3643;
+  --text: #e9f1ff;
+  --muted: #b6c7de;
+  --accent: #ffb86c;
+  --accent-contrast: #111827;
+  --glow: rgba(255,184,108,.2);
+  --focus: rgba(255,184,108,.35);
+}
+
+[data-phase="DAY"], [data-phase="LOBBY"] {
+  --bg: #0f172a;
+  --surface: #141c2f;
+  --border: #233047;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --accent: #60a5fa;
+  --accent-contrast: #0b1220;
+  --glow: rgba(96,165,250,.25);
+  --focus: rgba(96,165,250,.45);
+}
 
 .min-h-dvh { min-height: 100dvh; }
-html, body { height: 100dvh; }
+html, body { height: 100dvh; background: var(--bg); color: var(--text); }
 .mobile-safe { padding-bottom: max(env(safe-area-inset-bottom), 12px); }
 
 /* When mobile actions are present, ensure inputs scroll above them */
@@ -17,25 +70,19 @@ body.has-mobile-actions input, body.has-mobile-actions textarea, body.has-mobile
 /* Reserve space at the bottom equal to the action bar height so content doesn't hide under it */
 .with-mobile-actions-space { padding-bottom: calc(var(--mobile-actions-h) + max(env(safe-area-inset-bottom), 16px)); }
 
-.card {
-  @apply bg-slate-800/80 backdrop-blur rounded-2xl shadow-soft border border-slate-700;
-}
+.card { background: color-mix(in srgb, var(--surface) 92%, #000 8%); border-color: var(--border); @apply rounded-2xl shadow-soft border; }
 
-button.primary {
-  @apply px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 active:bg-indigo-600 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow;
-}
+button.primary { @apply px-4 py-2 rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow; background: var(--accent); color: var(--accent-contrast); }
+button.primary:hover { filter: brightness(1.05); box-shadow: 0 0 0 3px var(--glow); }
+button.primary:active { filter: brightness(.95); }
 
-button.secondary {
-  @apply px-3 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white transition;
-}
+button.secondary { @apply px-3 py-2 rounded-xl transition; background: color-mix(in srgb, var(--surface) 85%, var(--accent) 15%); color: var(--text); }
+button.secondary:hover { filter: brightness(1.05); }
 
-input.text {
-  @apply w-full px-4 py-2 rounded-xl bg-slate-700 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-400 placeholder:text-slate-400;
-}
+input.text, select.text { @apply w-full px-4 py-2 rounded-xl focus:outline-none; background: color-mix(in srgb, var(--surface) 90%, #000 10%); border: 1px solid var(--border); color: var(--text); }
+::placeholder { color: var(--muted); }
 
-label.label {
-  @apply text-sm text-slate-300;
-}
+label.label { @apply text-sm; color: var(--muted); }
 
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(6px); }

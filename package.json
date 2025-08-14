@@ -6,7 +6,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently -k \"pnpm --filter @imposter/server dev\" \"pnpm --filter @imposter/client dev\"",
+    "dev": "concurrently -k \"pnpm --filter @imposter/server dev\" \"pnpm --filter @imposter/client dev\" \"pnpm --filter @mafia/server dev\"",
     "lint": "pnpm -r lint",
     "build": "pnpm -r build",
     "test": "pnpm -r test"
